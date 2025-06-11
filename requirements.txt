@@ -1,0 +1,9 @@
+
+fastapi
+uvicorn
+transformers
+torch
+moviepy
+deep-translator
+ffmpeg
+whisper
