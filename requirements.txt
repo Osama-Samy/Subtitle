@@ -1,12 +1,2 @@
 fastapi
 uvicorn
-moviepy
-whisper
-deep-translator
-pydantic
-python-multipart
-ffmpeg-python
-numpy
-imageio
-decorator
-proglog
