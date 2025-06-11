@@ -1,2 +1,9 @@
 fastapi
 uvicorn
+transformers
+torch
+moviepy
+deep-translator
+python-multipart
+whisper
+ffmpeg-python
