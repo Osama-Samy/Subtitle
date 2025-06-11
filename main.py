@@ -1,13 +1,13 @@
 import os
-import subprocess
 import tempfile
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
-from transformers import pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
 import torch
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from transformers import pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
 from moviepy.editor import VideoFileClip
 from datetime import timedelta
 from deep_translator import GoogleTranslator
+import subprocess
 
 app = FastAPI(title="Video Subtitle Translator")
 
@@ -16,7 +16,7 @@ def format_time(seconds):
     hours, remainder = divmod(td.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     milliseconds = td.microseconds // 1000
-    return f"{hours:02d}:{minutes:02d},{seconds:03d}"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 def extract_audio(video_path):
     temp_dir = tempfile.gettempdir()
@@ -61,23 +61,27 @@ def translate_text(text):
 def create_srt(segments, output_path):
     with open(output_path, 'w', encoding='utf-8-sig') as srt_file:
         for i, segment in enumerate(segments, start=1):
-            if hasattr(segment, 'get'):
-                start_time = segment.get('start', 0)
-                end_time = segment.get('end', 0)
-                text = segment.get('text', '')
-                translation = segment.get('translation', '')
-            else:
-                start_time = segment.start
-                end_time = segment.end
-                text = segment.text
-                translation = getattr(segment, 'translation', text)
+            start_time = segment.get('start', 0)
+            end_time = segment.get('end', 0)
+            translation = segment.get('translation', '')
             srt_file.write(f"{i}\n")
             srt_file.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
             srt_file.write(f"{translation}\n\n")
 
+def burn_subtitles(video_path, srt_path, output_path):
+    # استخدم خط افتراضي (Arial) لتجنب مشاكل الخطوط في Azure
+    cmd = [
+        'ffmpeg', '-y', '-i', video_path,
+        '-vf', f"subtitles={srt_path}:force_style='FontName=Arial,FontSize=24'",
+        '-c:v', 'libx264', '-crf', '18',
+        '-c:a', 'copy',
+        output_path
+    ]
+    subprocess.run(cmd, check=True)
+    return output_path
+
 @app.post("/translate/")
 async def translate_video(file: UploadFile = File(...)):
-    # حفظ الفيديو مؤقتًا
     temp_dir = tempfile.gettempdir()
     video_path = os.path.join(temp_dir, file.filename)
     with open(video_path, "wb") as f:
@@ -88,17 +92,15 @@ async def translate_video(file: UploadFile = File(...)):
         segments = transcribe_audio(audio_path)
         translated_segments = []
         for segment in segments:
-            if hasattr(segment, 'get'):
-                text = segment.get('text', '')
-                translated_text = translate_text(text)
-                segment['translation'] = translated_text
-            else:
-                text = segment.text
-                segment.translation = translate_text(text)
+            text = segment['text'] if isinstance(segment, dict) else getattr(segment, 'text', '')
+            translated_text = translate_text(text)
+            segment['translation'] = translated_text
             translated_segments.append(segment)
         srt_path = os.path.join(temp_dir, f"{os.path.splitext(file.filename)[0]}.srt")
         create_srt(translated_segments, srt_path)
-        return FileResponse(srt_path, media_type="application/x-subrip", filename="translated.srt")
+        output_video_path = os.path.join(temp_dir, f"{os.path.splitext(file.filename)[0]}_ar.mp4")
+        burn_subtitles(video_path, srt_path, output_video_path)
+        return FileResponse(output_video_path, media_type="video/mp4", filename="video_with_arabic_subtitle.mp4")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -106,8 +108,10 @@ async def translate_video(file: UploadFile = File(...)):
         try:
             if os.path.exists(video_path):
                 os.remove(video_path)
-            if os.path.exists(audio_path):
+            if 'audio_path' in locals() and os.path.exists(audio_path):
                 os.remove(audio_path)
+            if 'srt_path' in locals() and os.path.exists(srt_path):
+                os.remove(srt_path)
         except:
             pass
 
