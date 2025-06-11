@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 # Create temp directory for processing
-TEMP_DIR = os.path.join(tempfile.gettempdir(), "subtitle_api")
+TEMP_DIR = os.path.join(os.getcwd(), "temp_files")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 # Create output directory
