@@ -1,0 +1,23 @@
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+
+- task: InstallDependencies@1
+  inputs:
+    packageManager: 'pip'
+    pipInstallArguments: '-r requirements.txt'
+
+- task: RunPythonScript@0
+  inputs:
+    scriptPath: 'main.py'  # اسم الملف الذي يحتوي على الكود

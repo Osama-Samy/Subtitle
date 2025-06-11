@@ -77,13 +77,9 @@ def create_srt(segments, output_path):
             end_time = segment.get('end', 0)
             text = segment.get('text', '')
             translation = segment.get('translation', '')
-            srt_file.write(f"{i}
-")
-            srt_file.write(f"{format_time(start_time)} --> {format_time(end_time)}
-")
-            srt_file.write(f"{translation}
-
-")
+            srt_file.write(f"{i}\n")
+            srt_file.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
+            srt_file.write(f"{translation}\n\n")
 
 # حرق الترجمات على الفيديو
 def burn_subtitles(video_path, srt_path, output_path):
@@ -142,4 +138,4 @@ async def process_video_endpoint(file: UploadFile = File(...)):
 # تشغيل التطبيق
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

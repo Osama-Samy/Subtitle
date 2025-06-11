@@ -1,15 +1,15 @@
 
-# Dockerfile
+# استخدام صورة Python الرسمية
 FROM python:3.8-slim
 
+# إعداد العمل داخل الحاوية
 WORKDIR /app
 
+# نسخ جميع الملفات إلى الحاوية
+COPY . /app
+
 # تثبيت المتطلبات
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# نسخ جميع الملفات
-COPY . .
-
-# تشغيل التطبيق باستخدام uvicorn
+# تشغيل التطبيق
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

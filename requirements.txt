@@ -1,9 +1,9 @@
 
 fastapi
 uvicorn
-transformers
-torch
 moviepy
+torch
+transformers
 deep-translator
 ffmpeg
 whisper
