@@ -1,4 +1,3 @@
 #!/bin/bash
-pip install --upgrade pip
-pip install -r requirements.txt
+echo "Running startup.sh script"
 gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app
