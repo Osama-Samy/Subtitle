@@ -1,10 +1,10 @@
 fastapi
 uvicorn
-gunicorn
 transformers
 torch
 moviepy
 deep-translator
-python-multipart
-whisper
 ffmpeg-python
+arabic-reshaper
+python-bidi
+whisper
