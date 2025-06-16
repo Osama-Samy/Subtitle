@@ -50,9 +50,11 @@ def create_srt(segments, output_path):
             srt_file.write(f"{i}\n")
             srt_file.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
             srt_file.write(f"{translation}\n\n")
+    # تحقق من أن ملف SRT ليس فارغًا
+    if os.path.getsize(output_path) == 0:
+        raise RuntimeError("ملف الترجمة SRT فارغ!")
 
 def burn_subtitles(video_path, srt_path, output_path):
-    # استخدام خط DejaVu Sans المتوفر افتراضيًا
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     cmd = [
         'ffmpeg', '-y', '-i', video_path,
@@ -61,13 +63,11 @@ def burn_subtitles(video_path, srt_path, output_path):
         '-c:a', 'copy',
         output_path
     ]
-    try:
-        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("FFmpeg Output:", result.stdout.decode())
-        print("FFmpeg Errors:", result.stderr.decode())
-    except subprocess.CalledProcessError as e:
-        print("FFmpeg Error:", e.stderr.decode())
-        raise RuntimeError(f"FFmpeg failed: {e.stderr.decode()}")
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("FFmpeg Output:", result.stdout.decode())
+    print("FFmpeg Errors:", result.stderr.decode())
+    if not os.path.exists(output_path):
+        raise RuntimeError(f"ffmpeg لم ينتج الملف: {output_path}\nFFmpeg Errors:\n{result.stderr.decode()}")
     return output_path
 
 def process_video(video_path):
@@ -103,7 +103,8 @@ async def process_video_endpoint(file: UploadFile = File(...)):
         if not os.path.exists(result_path):
             raise HTTPException(status_code=500, detail="فشل في إنشاء الفيديو المترجم.")
             
-        return FileResponse(result_path, media_type="video/mp4", filename="translated.mp4")
+        response = FileResponse(result_path, media_type="video/mp4", filename="translated.mp4")
+        return response
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ داخلي: {str(e)}")
@@ -111,8 +112,8 @@ async def process_video_endpoint(file: UploadFile = File(...)):
     finally:
         if video_path and os.path.exists(video_path):
             os.unlink(video_path)
-        if result_path and os.path.exists(result_path):
-            os.unlink(result_path)
+        # لا تحذف result_path هنا، اتركه حتى يتم إرسال الرد بالكامل
+        # يمكن حذف ملفات /tmp القديمة بعملية تنظيف دورية
 
 if __name__ == "__main__":
     import uvicorn
