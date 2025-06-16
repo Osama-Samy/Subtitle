@@ -1,13 +1,12 @@
 import os
 import subprocess
 import tempfile
-import torch
+from datetime import timedelta
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import FileResponse
-from transformers import pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
 from moviepy.editor import VideoFileClip
-from datetime import timedelta
 from deep_translator import GoogleTranslator
+import whisper  # استخدام Whisper بدلاً من transformers
 
 app = FastAPI()
 
@@ -29,29 +28,13 @@ def extract_audio(video_path):
 
 def transcribe_audio(audio_path):
     try:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model_id = "fractalego/personal-speech-to-text-model"
-        model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
-        processor = AutoProcessor.from_pretrained(model_id)
-        model.to(device)
-        pipe = pipeline(
-            "automatic-speech-recognition",
-            model=model,
-            tokenizer=processor.tokenizer,
-            feature_extractor=processor.feature_extractor,
-            max_new_tokens=128,
-            chunk_length_s=30,
-            batch_size=16,
-            return_timestamps=True,
-            device=device,
-        )
-        result = pipe(audio_path)
-        return result["chunks"]
-    except Exception as e:
-        import whisper
+        # استخدام Whisper مباشرة
         model = whisper.load_model("base")
         result = model.transcribe(audio_path, word_timestamps=True)
         return result["segments"]
+    except Exception as e:
+        print(f"حدث خطأ في التحويل الصوتي: {e}")
+        raise
 
 def translate_text(text):
     translator = GoogleTranslator(source='en', target='ar')
@@ -60,10 +43,10 @@ def translate_text(text):
 def create_srt(segments, output_path):
     with open(output_path, 'w', encoding='utf-8-sig') as srt_file:
         for i, segment in enumerate(segments, start=1):
-            start_time = segment.get('start', 0)
-            end_time = segment.get('end', 0)
+            start_time = segment['start']
+            end_time = segment['end']
             text = segment.get('text', '')
-            translation = segment.get('translation', '')
+            translation = translate_text(text)
             srt_file.write(f"{i}\n")
             srt_file.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
             srt_file.write(f"{translation}\n\n")
@@ -85,14 +68,8 @@ def process_video(video_path):
     file_name = os.path.splitext(os.path.basename(video_path))[0]
     audio_path, duration = extract_audio(video_path)
     segments = transcribe_audio(audio_path)
-    translated_segments = []
-    for segment in segments:
-        text = segment['text'] if isinstance(segment, dict) else segment.text
-        translated_text = translate_text(text)
-        segment['translation'] = translated_text
-        translated_segments.append(segment)
     srt_path = os.path.join(temp_dir, f"{file_name}.srt")
-    create_srt(translated_segments, srt_path)
+    create_srt(segments, srt_path)
     output_path = os.path.join(temp_dir, f"{file_name}_translated.mp4")
     burn_subtitles(video_path, srt_path, output_path)
     return output_path
